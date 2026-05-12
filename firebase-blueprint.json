@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Additional information for the registered user",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "phoneNumber", "role"]
+    },
+    "Application": {
+      "title": "Registration Application",
+      "description": "Birth, Death or Correction application data",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["new", "correction", "death"] },
+        "status": { "type": "string", "enum": ["pending", "processing", "approved", "rejected"] },
+        "applicantName": { "type": "string" },
+        "formData": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "comment": { "type": "string" }
+      },
+      "required": ["userId", "type", "status", "applicantName", "formData", "createdAt"]
+    },
+    "Village": {
+      "title": "Village Mapping",
+      "description": "Mapping from ward number to village name",
+      "type": "object",
+      "properties": {
+        "wardNo": { "type": "string" },
+        "villageName": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["wardNo", "villageName"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "applications/{applicationId}": {
+      "schema": "Application",
+      "description": "Application documents"
+    },
+    "villages/{wardNo}": {
+      "schema": "Village",
+      "description": "Ward logic for village names"
+    }
+  }
+}

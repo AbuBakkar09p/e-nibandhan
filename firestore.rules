@@ -1,0 +1,134 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      // Identity checks MUST be verified against a trusted document
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      // Rule 8: Relational checks MUST prevent unauthorized scraping
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isOwner(userId) || isAdmin();
+
+      function isValidUser(data) {
+        return data.fullName is string && data.fullName.size() <= 100 &&
+               data.phoneNumber is string && data.phoneNumber.size() <= 20 &&
+               data.address is string && data.address.size() <= 300 &&
+               (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 1000) &&
+               data.role in ['user', 'admin'] &&
+               data.createdAt is number &&
+               (data.get('updatedAt', 0) is number);
+      }
+
+      allow create: if isOwner(userId) && 
+                      isValidUser(incoming()) && 
+                      incoming().role == 'user';
+
+      allow update: if (isOwner(userId) && 
+                       isValidUser(incoming()) && 
+                       incoming().role == existing().role &&
+                       incoming().createdAt == existing().createdAt && // Immutable field
+                       incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phoneNumber', 'address', 'photoURL', 'updatedAt'])) ||
+                       isAdmin();
+    }
+
+    // --- Applications Collection ---
+    match /applications/{applicationId} {
+      allow get: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+      
+      // Rule 8: Secure List Queries - evaluation must restrict resource.data
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      function isValidApplication(data) {
+        let isValidBase = data.userId is string && data.userId == request.auth.uid &&
+               data.type in ['new', 'correction', 'death'] &&
+               data.status in ['pending', 'processing', 'approved', 'rejected'] &&
+               data.applicantName is string && data.applicantName.size() <= 200 &&
+               data.get('formData', null) is map &&
+               data.createdAt is number &&
+               data.updatedAt is number;
+        
+        let formData = data.formData;
+        let isValidFormData = (formData.applicantNameBn is string && formData.applicantNameBn.size() <= 200) &&
+                             (formData.applicantNameEn is string && formData.applicantNameEn.size() <= 200) &&
+                             (formData.dob is string && formData.dob.size() <= 20) &&
+                             (formData.gender in ['male', 'female', 'other']) &&
+                             (formData.get('numberOfChildren', '1') is string || formData.get('numberOfChildren', 1) is number) &&
+                             (formData.get('wardNo', '') is string) &&
+                             (formData.get('villageName', '') is string) &&
+                             (formData.get('fatherCertificateNo', '') is string) &&
+                             (formData.get('fatherDob', '') is string) &&
+                             (formData.get('motherCertificateNo', '') is string) &&
+                             (formData.get('motherDob', '') is string) &&
+                             (formData.get('mobileNumber', '') is string);
+                             
+        return isValidBase && isValidFormData;
+      }
+
+      allow create: if isSignedIn() && 
+                      isValidApplication(incoming()) && 
+                      incoming().status == 'pending' &&
+                      isValidId(applicationId);
+
+      allow update: if isSignedIn() && (
+        // Admin update
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasAny(['status', 'comment', 'updatedAt'])) ||
+        // User update
+        (isOwner(existing().userId) && 
+         existing().status == 'pending' &&
+         isValidApplication(incoming()) &&
+         incoming().status == 'pending' &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['applicantName', 'formData', 'updatedAt']))
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // --- Villages Collection ---
+    match /villages/{villageId} {
+      allow read: if isSignedIn();
+      
+      function isValidVillage(data) {
+        return data.wardNo is string && data.wardNo.size() <= 10 &&
+               data.villageNameBn is string && data.villageNameBn.size() <= 200 &&
+               data.villageNameEn is string && data.villageNameEn.size() <= 200 &&
+               data.postOfficeBn is string && data.postOfficeBn.size() <= 200 &&
+               data.postOfficeEn is string && data.postOfficeEn.size() <= 200;
+      }
+
+      allow create, update: if isSignedIn() && isValidVillage(incoming()) && isValidId(villageId);
+      allow delete: if request.auth != null;
+    }
+  }
+}
