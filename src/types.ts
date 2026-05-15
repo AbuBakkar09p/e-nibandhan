@@ -10,6 +10,7 @@ export interface UserProfile {
   photoURL?: string;
   role: 'user' | 'admin';
   createdAt: number;
+  balance: number;
 }
 
 export interface Application {

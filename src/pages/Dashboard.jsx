@@ -3,7 +3,7 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { Link } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import { Application, OperationType } from '../types';
+import { OperationType } from '../types';
 import { handleFirestoreError } from '../lib/error-handler';
 import { toBengaliNumber } from '../lib/utils';
 import { FileText, Clock, CheckCircle, XCircle, ChevronRight, Edit2, Trash2, RefreshCw } from 'lucide-react';
@@ -14,9 +14,9 @@ import { motion, AnimatePresence } from 'motion/react';
 const Dashboard = () => {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const [applications, setApplications] = useState<Application[]>([]);
+  const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -43,7 +43,7 @@ const Dashboard = () => {
 
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
-        const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application));
+        const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setApplications(apps);
         setLoading(false);
       },
@@ -56,7 +56,7 @@ const Dashboard = () => {
     return () => unsubscribe();
   }, [user]);
 
-  const getStatusInfo = (status: string) => {
+  const getStatusInfo = (status) => {
     switch (status) {
       case 'pending': return { icon: <Clock size={12} />, text: 'যাচাই চলছে', color: 'text-amber-700 bg-amber-100 border-transparent' };
       case 'processing': return { icon: <Clock size={12} />, text: 'প্রক্রিয়াধীন', color: 'text-blue-700 bg-blue-100 border-transparent' };
@@ -66,7 +66,7 @@ const Dashboard = () => {
     }
   };
 
-  const getTypeName = (type: string) => {
+  const getTypeName = (type) => {
     switch (type) {
       case 'new': return 'নতুন জন্ম নিবন্ধন';
       case 'correction': return 'সংশোধনী আবেদন';
@@ -265,7 +265,7 @@ const Dashboard = () => {
   );
 };
 
-const StatCard = ({ title, value, progress, progressColor, unit = '' }: { title: string, value: number, progress: number, progressColor: string, unit?: string }) => (
+const StatCard = ({ title, value, progress, progressColor, unit = '' }) => (
   <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
     <p className="text-sm text-slate-500 font-semibold">{title}</p>
     <div className="flex items-baseline gap-1 mt-2">
@@ -283,7 +283,7 @@ const StatCard = ({ title, value, progress, progressColor, unit = '' }: { title:
   </div>
 );
 
-const ReportCard = ({ title, count, link, color, icon }: { title: string, count: number, link: string, color: string, icon: React.ReactNode }) => (
+const ReportCard = ({ title, count, link, color, icon }) => (
   <Link to={link} className="group relative bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between overflow-hidden">
     <div className="relative z-10">
       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{title}</p>

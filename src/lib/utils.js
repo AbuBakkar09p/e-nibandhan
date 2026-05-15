@@ -1,12 +1,12 @@
-import { clsx, type ClassValue } from 'clsx';
+import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-export function cn(...inputs: ClassValue[]) {
+export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-export function toBengaliNumber(number: string | number): string {
-  const bengaliDigits: { [key: string]: string } = {
+export function toBengaliNumber(number) {
+  const bengaliDigits = {
     '0': '০',
     '1': '১',
     '2': '২',

@@ -9,6 +9,8 @@ import Profile from './pages/Profile';
 import ApplicationForm from './pages/ApplicationForm';
 import Reports from './pages/Reports';
 import VillageManagement from './pages/VillageManagement';
+import PaymentGateway from './pages/PaymentGateway';
+import VerifyCertificate from './pages/VerifyCertificate';
 import { motion, AnimatePresence } from 'motion/react';
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
@@ -68,6 +70,16 @@ function AppRoutes() {
           <Route path="/admin/villages" element={
             <PrivateRoute>
               <VillageManagement />
+            </PrivateRoute>
+          } />
+          <Route path="/payment-gateway" element={
+            <PrivateRoute>
+              <PaymentGateway />
+            </PrivateRoute>
+          } />
+          <Route path="/verify" element={
+            <PrivateRoute>
+              <VerifyCertificate />
             </PrivateRoute>
           } />
         </Routes>

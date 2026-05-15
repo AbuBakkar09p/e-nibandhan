@@ -10,7 +10,7 @@ service cloud.firestore {
 
     // --- Helpers ---
     function isSignedIn() {
-      return request.auth != null && request.auth.token.email_verified == true;
+      return request.auth != null;
     }
 
     function isOwner(userId) {
@@ -20,7 +20,7 @@ service cloud.firestore {
     function isAdmin() {
       // Identity checks MUST be verified against a trusted document
       return isSignedIn() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).get('role', 'user') == 'admin';
     }
 
     function isValidId(id) {
@@ -45,10 +45,11 @@ service cloud.firestore {
         return data.fullName is string && data.fullName.size() <= 100 &&
                data.phoneNumber is string && data.phoneNumber.size() <= 20 &&
                data.address is string && data.address.size() <= 300 &&
-               (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 1000) &&
+               (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 1500000) &&
                data.role in ['user', 'admin'] &&
                data.createdAt is number &&
-               (data.get('updatedAt', 0) is number);
+               (data.get('updatedAt', 0) is number) &&
+               (data.get('balance', 0) is number);
       }
 
       allow create: if isOwner(userId) && 
@@ -59,7 +60,7 @@ service cloud.firestore {
                        isValidUser(incoming()) && 
                        incoming().role == existing().role &&
                        incoming().createdAt == existing().createdAt && // Immutable field
-                       incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phoneNumber', 'address', 'photoURL', 'updatedAt'])) ||
+                       incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phoneNumber', 'address', 'photoURL', 'updatedAt', 'balance'])) ||
                        isAdmin();
     }
 

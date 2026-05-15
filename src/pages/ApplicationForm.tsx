@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { collection, addDoc, serverTimestamp, setDoc, doc, getDocs } from 'firebase/firestore';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { collection, addDoc, serverTimestamp, setDoc, doc, getDocs, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { ApplicationType, OperationType } from '../types';
@@ -21,8 +21,43 @@ interface Village {
   postOfficeEn: string;
 }
 
+const DEFAULT_FORM_DATA = {
+  applicantNameBn: '',
+  applicantNameEn: '',
+  dob: '',
+  gender: '',
+  numberOfChildren: '1',
+  wardNo: '',
+  villageName: '',
+  fatherCertificateNo: '',
+  fatherDob: '',
+  fatherNameBn: '',
+  fatherNameEn: '',
+  motherCertificateNo: '',
+  motherDob: '',
+  motherNameBn: '',
+  motherNameEn: '',
+  mobileNumber: '',
+  nidNumber: '',
+  relationship: '',
+  applicantBrn: '',
+  applicantDob: '',
+  verifiedApplicantName: '',
+  reason: '',
+  dateOfDeath: '',
+  deathCause: '',
+  spouseBrn: '',
+  spouseNid: '',
+  spouseNameBn: '',
+  spouseNameEn: '',
+  placeOfDeathWard: '',
+  placeOfDeathVillage: '',
+};
+
 const ApplicationForm = () => {
   const { type } = useParams<{ type: string }>();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('editId');
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -41,43 +76,11 @@ const ApplicationForm = () => {
   const dayInputRef = useRef<HTMLInputElement>(null);
   const monthInputRef = useRef<HTMLInputElement>(null);
   const yearInputRef = useRef<HTMLInputElement>(null);
-
   const [formStep, setFormStep] = useState<'form' | 'upload' | 'otp'>('form');
   const [otpCode, setOtpCode] = useState('');
   const [attachments, setAttachments] = useState<{ id: string; type: string; typeLabel: string; fileName: string }[]>([]);
   const [currentUpload, setCurrentUpload] = useState({ type: '', fileName: '', file: null as File | null });
-  const [formData, setFormData] = useState({
-    applicantNameBn: '',
-    applicantNameEn: '',
-    dob: '',
-    gender: '',
-    numberOfChildren: '1',
-    wardNo: '',
-    villageName: '',
-    fatherCertificateNo: '',
-    fatherDob: '',
-    fatherNameBn: '',
-    fatherNameEn: '',
-    motherCertificateNo: '',
-    motherDob: '',
-    motherNameBn: '',
-    motherNameEn: '',
-    mobileNumber: '',
-    nidNumber: '',
-    relationship: '', // New field for relationship
-    applicantBrn: '', // New field
-    applicantDob: '', // New field
-    verifiedApplicantName: '', // New field
-    reason: '', // for correction
-    dateOfDeath: '', // for death
-    deathCause: '', // for death
-    spouseBrn: '', // for death
-    spouseNid: '', // for death
-    spouseNameBn: '', // for death
-    spouseNameEn: '', // for death
-    placeOfDeathWard: '', // for death
-    placeOfDeathVillage: '', // for death
-  });
+  const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
 
   const [verification, setVerification] = useState({
     father: 'idle' as 'idle' | 'verifying' | 'verified' | 'error',
@@ -94,8 +97,8 @@ const ApplicationForm = () => {
   }, [formData.wardNo, villageList]);
 
   useEffect(() => {
-    const vRef = formData.fatherCertificateNo.trim().replace(/\s/g, '');
-    const vDob = formData.fatherDob.trim();
+    const vRef = (formData.fatherCertificateNo || '').trim().replace(/\s/g, '');
+    const vDob = (formData.fatherDob || '').trim();
     
     if (vRef.length === 17 && vDob.length >= 8) {
       if (verification.father === 'idle' || verification.father === 'error') {
@@ -109,8 +112,8 @@ const ApplicationForm = () => {
   }, [formData.fatherCertificateNo, formData.fatherDob]);
 
   useEffect(() => {
-    const vRef = formData.motherCertificateNo.trim().replace(/\s/g, '');
-    const vDob = formData.motherDob.trim();
+    const vRef = (formData.motherCertificateNo || '').trim().replace(/\s/g, '');
+    const vDob = (formData.motherDob || '').trim();
     
     if (vRef.length === 17 && vDob.length >= 8) {
       if (verification.mother === 'idle' || verification.mother === 'error') {
@@ -124,8 +127,8 @@ const ApplicationForm = () => {
   }, [formData.motherCertificateNo, formData.motherDob]);
 
   useEffect(() => {
-    const vRef = formData.applicantBrn.trim().replace(/\s/g, '');
-    const vDob = formData.applicantDob.trim();
+    const vRef = (formData.applicantBrn || '').trim().replace(/\s/g, '');
+    const vDob = (formData.applicantDob || '').trim();
     
     if (vRef.length === 17 && vDob.length >= 8) {
       if (verification.applicant === 'idle' || verification.applicant === 'error') {
@@ -140,16 +143,16 @@ const ApplicationForm = () => {
 
   const autoVerify = async (parent: 'father' | 'mother' | 'applicant') => {
     const certNo = parent === 'father'
-      ? formData.fatherCertificateNo
+      ? (formData.fatherCertificateNo || '')
       : parent === 'mother'
-        ? formData.motherCertificateNo
-        : formData.applicantBrn;
+        ? (formData.motherCertificateNo || '')
+        : (formData.applicantBrn || '');
 
     const dob = parent === 'father'
-      ? formData.fatherDob
+      ? (formData.fatherDob || '')
       : parent === 'mother'
-        ? formData.motherDob
-        : formData.applicantDob;
+        ? (formData.motherDob || '')
+        : (formData.applicantDob || '');
 
     const cleanCert = certNo.replace(/\s/g, '');
 
@@ -208,7 +211,20 @@ const ApplicationForm = () => {
         }
       }));
 
-      if (parent === 'applicant') {
+      // Auto-populate formData names when verified
+      if (parent === 'father') {
+        setFormData(prev => ({ 
+          ...prev, 
+          fatherNameBn: result.data.name_bn,
+          fatherNameEn: result.data.name_en
+        }));
+      } else if (parent === 'mother') {
+        setFormData(prev => ({ 
+          ...prev, 
+          motherNameBn: result.data.name_bn,
+          motherNameEn: result.data.name_en
+        }));
+      } else if (parent === 'applicant') {
         setFormData(prev => ({ ...prev, verifiedApplicantName: result.data.name_bn }));
       }
 
@@ -220,6 +236,39 @@ const ApplicationForm = () => {
       }));
     }
   };
+
+  useEffect(() => {
+    const fetchApplication = async () => {
+      if (!editId || !user) return;
+      
+      setLoading(true);
+      try {
+        const docRef = doc(db, 'applications', editId);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.userId === user.uid) {
+            setFormData(prev => ({ ...DEFAULT_FORM_DATA, ...data.formData }));
+            setAttachments(data.attachments || []);
+            
+            // Set search status based on type
+            if (type === 'correction') setIsCorrectionSearched(true);
+            if (type === 'death') setIsDeathSearched(true);
+          } else {
+            console.error('Unauthorized edit attempt');
+            navigate('/dashboard');
+          }
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, `applications/${editId}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchApplication();
+  }, [editId, user, type]);
 
   useEffect(() => {
     const fetchVillages = async () => {
@@ -401,19 +450,33 @@ const ApplicationForm = () => {
     
     setLoading(true);
     try {
-      const appRef = collection(db, 'applications');
       const now = Date.now();
       
-      await addDoc(appRef, {
-        userId: user.uid,
-        type: type as ApplicationType,
-        status: 'pending',
-        applicantName: type === 'death' ? formData.verifiedApplicantName : formData.applicantNameBn,
-        formData: formData,
-        attachments: (type === 'correction' || type === 'new' || type === 'death') ? attachments : [],
-        createdAt: now,
-        updatedAt: now,
-      });
+      // Sync verification data to formData for storage
+      const finalFormData = { ...formData };
+      if (editId) {
+        // Update existing document
+        const appRef = doc(db, 'applications', editId);
+        await updateDoc(appRef, {
+          applicantName: type === 'death' ? formData.verifiedApplicantName : formData.applicantNameBn,
+          formData: finalFormData,
+          attachments: (type === 'correction' || type === 'new' || type === 'death') ? attachments : [],
+          updatedAt: now,
+        });
+      } else {
+        // Create new document
+        const appRef = collection(db, 'applications');
+        await addDoc(appRef, {
+          userId: user.uid,
+          type: type as ApplicationType,
+          status: 'pending',
+          applicantName: type === 'death' ? formData.verifiedApplicantName : formData.applicantNameBn,
+          formData: finalFormData,
+          attachments: (type === 'correction' || type === 'new' || type === 'death') ? attachments : [],
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
       
       setSubmitted(true);
       setTimeout(() => navigate('/dashboard'), 3000);
@@ -989,15 +1052,15 @@ const ApplicationForm = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-gray-700">ব্যক্তির নাম (বাংলা) <span className="text-red-500">*</span></label>
-                    <input name="applicantNameBn" required value={formData.applicantNameBn} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20" type="text" placeholder="সঠিক নাম বাংলায় লিখুন" />
+                    <input name="applicantNameBn" required value={formData.applicantNameBn || ''} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20" type="text" placeholder="সঠিক নাম বাংলায় লিখুন" />
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-gray-700">ব্যক্তির নাম (ইংরেজি) <span className="text-red-500">*</span></label>
-                    <input name="applicantNameEn" required value={formData.applicantNameEn} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20 uppercase" type="text" placeholder="CORRECT NAME IN ENGLISH" />
+                    <input name="applicantNameEn" required value={formData.applicantNameEn || ''} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20 uppercase" type="text" placeholder="CORRECT NAME IN ENGLISH" />
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-gray-700">জন্ম তারিখ <span className="text-red-500">*</span></label>
-                    <input name="dob" required value={formData.dob} onChange={(e) => handleDateChange(e, 'dob')} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20" type="text" placeholder="DD-MM-YYYY" maxLength={10} />
+                    <input name="dob" required value={formData.dob || ''} onChange={(e) => handleDateChange(e, 'dob')} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20" type="text" placeholder="DD-MM-YYYY" maxLength={10} />
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-gray-700">লিঙ্গ (ঐচ্ছিক)</label>
@@ -1005,9 +1068,9 @@ const ApplicationForm = () => {
                       {['male', 'female', 'others'].map((g) => (
                         <button 
                           key={g} type="button" 
-                          onClick={() => setFormData({ ...formData, gender: g })}
+                          onClick={() => setFormData(prev => ({ ...prev, gender: g }))}
                           className={`py-2 px-3 rounded-md text-xs font-medium transition-all ${
-                            formData.gender === g ? 'bg-white text-orange-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'
+                            (formData.gender || '') === g ? 'bg-white text-orange-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'
                           }`}
                         >
                           {g === 'male' ? 'পুরুষ' : g === 'female' ? 'নারী' : 'অন্যান্য'}
@@ -1016,35 +1079,19 @@ const ApplicationForm = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-700">পিতার নাম (বাংলা) <span className="text-red-500">*</span></label>
-                    <input name="fatherNameBn" required value={formData.fatherNameBn} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20" type="text" placeholder="পিতার সঠিক নাম বাংলায়" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-700">পিতার নাম (ইংরেজি) <span className="text-red-500">*</span></label>
-                    <input name="fatherNameEn" required value={formData.fatherNameEn} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20 uppercase" type="text" placeholder="FATHER'S CORRECT NAME IN ENGLISH" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-700">মাতার নাম (বাংলা) <span className="text-red-500">*</span></label>
-                    <input name="motherNameBn" required value={formData.motherNameBn} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20" type="text" placeholder="মাতার সঠিক নাম বাংলায়" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-700">মাতার নাম (ইংরেজি) <span className="text-red-500">*</span></label>
-                    <input name="motherNameEn" required value={formData.motherNameEn} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20 uppercase" type="text" placeholder="MOTHER'S CORRECT NAME IN ENGLISH" />
-                  </div>
-                  <div className="space-y-2">
                     <label className="block text-sm font-bold text-gray-700">পিতা-মাতার কততম সন্তান <span className="text-red-500">*</span></label>
                     <input 
                       name="numberOfChildren" 
                       required 
                       min="1" 
                       max="20" 
-                      value={formData.numberOfChildren} 
+                      value={formData.numberOfChildren || ''} 
                       onChange={(e) => {
                         const val = parseInt(e.target.value);
                         if (val >= 1 && val <= 20) {
-                          setFormData({ ...formData, numberOfChildren: e.target.value });
+                          setFormData(prev => ({ ...prev, numberOfChildren: e.target.value }));
                         } else if (e.target.value === '') {
-                          setFormData({ ...formData, numberOfChildren: '' });
+                          setFormData(prev => ({ ...prev, numberOfChildren: '' }));
                         }
                       }} 
                       className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20" 
@@ -1054,11 +1101,11 @@ const ApplicationForm = () => {
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-gray-700">মোবাইল নম্বর <span className="text-red-500">*</span></label>
-                    <input name="mobileNumber" required value={formData.mobileNumber} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20" type="text" placeholder="০১XXXXXXXXX" />
+                    <input name="mobileNumber" required value={formData.mobileNumber || ''} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20" type="text" placeholder="০১XXXXXXXXX" />
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-bold text-gray-700">ওয়ার্ড নং <span className="text-red-500">*</span></label>
-                    <select name="wardNo" required value={formData.wardNo} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20">
+                    <select name="wardNo" required value={formData.wardNo || ''} onChange={handleChange} className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20">
                       <option value="">ওয়ার্ড নির্বাচন করুন</option>
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(w => <option key={w} value={w.toString()}>{w} নম্বর ওয়ার্ড</option>)}
                     </select>
@@ -1068,7 +1115,7 @@ const ApplicationForm = () => {
                     <select 
                       name="villageName" 
                       required 
-                      value={formData.villageName} 
+                      value={formData.villageName || ''} 
                       onChange={handleChange}
                       className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-orange-300 focus:ring-orange-500/20"
                     >
@@ -1303,96 +1350,96 @@ const ApplicationForm = () => {
                           <input 
                             name="applicantBrn"
                             required
-                            value={formData.applicantBrn}
+                            value={formData.applicantBrn || ''}
                             onChange={(e) => {
                               const val = e.target.value.replace(/\D/g, '').slice(0, 17);
-                              setFormData({ ...formData, applicantBrn: val });
+                              setFormData(prev => ({ ...prev, applicantBrn: val }));
                             }}
                             placeholder="১৭ ডিজিট জন্ম নিবন্ধন নম্বর" 
                             className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-white text-gray-800 border-gray-300 focus:border-indigo-300 focus:ring-indigo-500/20" 
-                            type="text" 
-                            maxLength={17}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium text-gray-700 font-bold">আবেদনকারীর জন্ম তারিখ <span className="text-rose-500">*</span></label>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                              <Calendar size={16} />
-                            </div>
-                            <input 
-                              name="applicantDob"
-                              required
-                              value={formData.applicantDob}
-                              onChange={(e) => handleDateChange(e, 'applicantDob')}
-                              placeholder="DD-MM-YYYY" 
-                              className="h-11 w-full rounded-lg border appearance-none px-4 pl-10 py-2.5 text-sm shadow-sm focus:outline-none focus:ring bg-white text-gray-800 border-gray-300 focus:border-indigo-300 focus:ring-indigo-500/20 font-bold" 
-                              type="text" 
-                              maxLength={10}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 p-4 bg-white border border-indigo-100 rounded-xl space-y-4 shadow-inner">
-                        <div className="flex items-center justify-between border-b border-indigo-50 pb-2">
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
-                              <span className="text-[10px] font-bold text-indigo-500 tracking-wider">আবেদনকারী যাচাইকরণ (BDRIS)</span>
-                            </div>
-                          </div>
-                          {verification.applicant === 'verifying' && <span className="flex items-center gap-1.5 text-indigo-500 text-[10px] font-bold bg-indigo-50 px-2 py-0.5 rounded-full"><Loader2 size={10} className="animate-spin" /> যাচাই করা হচ্ছে...</span>}
-                          {verification.applicant === 'verified' && <span className="flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold bg-emerald-50 px-2 py-0.5 rounded-full"><CheckCircle size={10} /> আবেদনকারী নিবন্ধিত</span>}
-                          {verification.applicant === 'error' && (
-                            <span className="flex items-center gap-1.5 text-red-500 text-[10px] font-bold bg-red-50 px-2 py-0.5 rounded-full">
-                              <XCircle size={10} /> তথ্য মেলেনি
-                            </span>
-                          )}
-                          {verification.applicant === 'idle' && <span className="text-gray-300 text-[10px] font-bold italic">অপেক্ষা করুন...</span>}
-                        </div>
-                        
-                        {verification.applicant === 'verified' && (
-                          <motion.div 
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl relative overflow-hidden"
-                          >
-                            <div className="relative z-10">
-                              <p className="text-[10px] text-indigo-600 font-extrabold uppercase tracking-widest flex items-center gap-1.5 mb-2">
-                                <CheckCircle size={10} /> বিডিআরআইএস যাচাইকৃত নাম
-                              </p>
-                              <p className="text-lg font-bold text-slate-800">{verification.applicantData.bn}</p>
-                              <p className="text-xs font-bold text-slate-500 uppercase">{verification.applicantData.en}</p>
-                            </div>
-                          </motion.div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              // Original Application Form (for New)
-              <>
-                {/* Section: Personal Info */}
-                <div className="space-y-8">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shadow-sm">
-                      <User size={20} />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 tracking-tight font-display">ব্যক্তিগত তথ্যসমূহ</h3>
-                    <div className="flex-1 h-px bg-slate-100"></div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             type="text" 
+                             maxLength={17}
+                           />
+                         </div>
+                         <div className="space-y-2">
+                           <label className="block text-sm font-medium text-gray-700 font-bold">আবেদনকারীর জন্ম তারিখ <span className="text-rose-500">*</span></label>
+                           <div className="relative">
+                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                               <Calendar size={16} />
+                             </div>
+                             <input 
+                               name="applicantDob"
+                               required
+                               value={formData.applicantDob || ''}
+                               onChange={(e) => handleDateChange(e, 'applicantDob')}
+                               placeholder="DD-MM-YYYY" 
+                               className="h-11 w-full rounded-lg border appearance-none px-4 pl-10 py-2.5 text-sm shadow-sm focus:outline-none focus:ring bg-white text-gray-800 border-gray-300 focus:border-indigo-300 focus:ring-indigo-500/20 font-bold" 
+                               type="text" 
+                               maxLength={10}
+                             />
+                           </div>
+                         </div>
+                       </div>
+ 
+                       <div className="mt-4 p-4 bg-white border border-indigo-100 rounded-xl space-y-4 shadow-inner">
+                         <div className="flex items-center justify-between border-b border-indigo-50 pb-2">
+                           <div className="flex flex-col">
+                             <div className="flex items-center gap-1.5">
+                               <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
+                               <span className="text-[10px] font-bold text-indigo-500 tracking-wider">আবেদনকারী যাচাইকরণ (BDRIS)</span>
+                             </div>
+                           </div>
+                           {verification.applicant === 'verifying' && <span className="flex items-center gap-1.5 text-indigo-500 text-[10px] font-bold bg-indigo-50 px-2 py-0.5 rounded-full"><Loader2 size={10} className="animate-spin" /> যাচাই করা হচ্ছে...</span>}
+                           {verification.applicant === 'verified' && <span className="flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold bg-emerald-50 px-2 py-0.5 rounded-full"><CheckCircle size={10} /> আবেদনকারী নিবন্ধিত</span>}
+                           {verification.applicant === 'error' && (
+                             <span className="flex items-center gap-1.5 text-red-500 text-[10px] font-bold bg-red-50 px-2 py-0.5 rounded-full">
+                               <XCircle size={10} /> তথ্য মেলেনি
+                             </span>
+                           )}
+                           {verification.applicant === 'idle' && <span className="text-gray-300 text-[10px] font-bold italic">অপেক্ষা করুন...</span>}
+                         </div>
+                         
+                         {verification.applicant === 'verified' && (
+                           <motion.div 
+                             initial={{ opacity: 0, scale: 0.95 }}
+                             animate={{ opacity: 1, scale: 1 }}
+                             className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl relative overflow-hidden"
+                           >
+                             <div className="relative z-10">
+                               <p className="text-[10px] text-indigo-600 font-extrabold uppercase tracking-widest flex items-center gap-1.5 mb-2">
+                                 <CheckCircle size={10} /> বিডিআরআইএস যাচাইকৃত নাম
+                               </p>
+                               <p className="text-lg font-bold text-slate-800">{verification.applicantData.bn}</p>
+                               <p className="text-xs font-bold text-slate-500 uppercase">{verification.applicantData.en}</p>
+                             </div>
+                           </motion.div>
+                         )}
+                       </div>
+                     </motion.div>
+                   )}
+                 </div>
+               </div>
+             ) : (
+               // Original Application Form (for New)
+               <>
+                 {/* Section: Personal Info */}
+                 <div className="space-y-8">
+                   <div className="flex items-center gap-4">
+                     <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shadow-sm">
+                       <User size={20} />
+                     </div>
+                     <h3 className="text-lg font-bold text-slate-800 tracking-tight font-display">ব্যক্তিগত তথ্যসমূহ</h3>
+                     <div className="flex-1 h-px bg-slate-100"></div>
+                   </div>
+ 
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest px-1">নাম (বাংলা) <span className="text-rose-500">*</span></label>
                       <div className="relative">
                         <input 
                           name="applicantNameBn"
                           required
-                          value={formData.applicantNameBn}
+                          value={formData.applicantNameBn || ''}
                           onChange={handleChange}
                           placeholder="যেমন: মোহাম্মদ আব্দুল্লাহ" 
                           className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
@@ -1406,7 +1453,7 @@ const ApplicationForm = () => {
                         <input 
                           name="applicantNameEn"
                           required
-                          value={formData.applicantNameEn}
+                          value={formData.applicantNameEn || ''}
                           onChange={handleChange}
                           placeholder="e.g. MOHAMMAD ABDULLAH" 
                           className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
@@ -1415,7 +1462,7 @@ const ApplicationForm = () => {
                       </div>
                     </div>
                   </div>
-
+ 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 font-bold">জন্ম তারিখ <span className="text-rose-500">*</span></label>
@@ -1428,14 +1475,14 @@ const ApplicationForm = () => {
                           required
                           type="text"
                           placeholder="দিন-মাস-বছর"
-                          value={formData.dob}
+                          value={formData.dob || ''}
                           onChange={(e) => handleDateChange(e, 'dob')}
                           maxLength={10}
                           className="h-11 w-full rounded-lg border appearance-none px-4 pl-10 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
                         />
                       </div>
                     </div>
-
+ 
                     <div className="space-y-2">
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest px-1">লিঙ্গ <span className="text-rose-500">*</span></label>
                       <div className="grid grid-cols-3 gap-2 bg-gray-100 p-1 rounded-lg">
@@ -1447,9 +1494,9 @@ const ApplicationForm = () => {
                           <button 
                             key={g.id}
                             type="button" 
-                            onClick={() => setFormData({ ...formData, gender: g.id })}
+                            onClick={() => setFormData(prev => ({ ...prev, gender: g.id }))}
                             className={`py-2 px-3 rounded-md text-xs font-medium transition-all ${
-                              formData.gender === g.id 
+                              (formData.gender || '') === g.id 
                                 ? 'bg-white text-blue-600 shadow-sm border border-gray-200' 
                                 : 'text-gray-500 hover:text-gray-700'
                             }`}
@@ -1459,7 +1506,7 @@ const ApplicationForm = () => {
                         ))}
                       </div>
                     </div>
-
+ 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 font-bold">কততম সন্তান <span className="text-rose-500">*</span></label>
                       <input 
@@ -1467,27 +1514,27 @@ const ApplicationForm = () => {
                         min="1"
                         max="20"
                         placeholder="১-২০"
-                        value={formData.numberOfChildren}
+                        value={formData.numberOfChildren || ''}
                         onChange={(e) => {
                           const val = parseInt(e.target.value);
                           if (val >= 1 && val <= 20) {
-                            setFormData({ ...formData, numberOfChildren: e.target.value });
+                            setFormData(prev => ({ ...prev, numberOfChildren: e.target.value }));
                           } else if (e.target.value === '') {
-                            setFormData({ ...formData, numberOfChildren: '' });
+                            setFormData(prev => ({ ...prev, numberOfChildren: '' }));
                           }
                         }}
                         className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20"
                       />
                     </div>
                   </div>
-
+ 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 font-bold">মোবাইল নম্বর <span className="text-rose-500">*</span></label>
                       <input 
                         name="mobileNumber"
                         required
-                        value={formData.mobileNumber}
+                        value={formData.mobileNumber || ''}
                         onChange={handleChange}
                         placeholder="০১XXXXXXXXX" 
                         className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
@@ -1498,7 +1545,7 @@ const ApplicationForm = () => {
                       <label className="block text-sm font-medium text-gray-700 font-bold">এনআইডি (NID) নম্বর</label>
                       <input 
                         name="nidNumber"
-                        value={formData.nidNumber}
+                        value={formData.nidNumber || ''}
                         onChange={handleChange}
                         placeholder="ভোটার আইডি কার্ড নম্বর (ঐচ্ছিক)" 
                         className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-transparent text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
@@ -1579,7 +1626,7 @@ const ApplicationForm = () => {
                         <div className="relative">
                           <input 
                             name="fatherCertificateNo"
-                            value={formData.fatherCertificateNo}
+                            value={formData.fatherCertificateNo || ''}
                             onChange={handleChange}
                             placeholder="পিতার জন্ম নিবন্ধন নম্বর" 
                             className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-white text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
@@ -1596,16 +1643,18 @@ const ApplicationForm = () => {
                         </label>
                         <div className="relative">
                           <input 
-                            name="fatherDob"
-                            value={formData.fatherDob}
-                            onChange={(e) => handleDateChange(e, 'fatherDob')}
-                            className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-white text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
-                            type="text"
-                            placeholder="DD-MM-YYYY (দিন-মাস-বছর)"
-                            maxLength={10}
-                          />
-                        </div>
-                      </div>
+                             name="fatherDob"
+                             value={formData.fatherDob}
+                             onChange={(e) => handleDateChange(e, 'fatherDob')}
+                             className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-white text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
+                             type="text"
+                             placeholder="DD-MM-YYYY (দিন-মাস-বছর)"
+                             maxLength={10}
+                           />
+                         </div>
+                       </div>
+ 
+                       {/* Manual name entry removed as per requirement */}
 
                       <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl space-y-4 shadow-inner">
                         <div className="flex items-center justify-between border-b border-gray-50 pb-2">
@@ -1713,16 +1762,16 @@ const ApplicationForm = () => {
                         </label>
                         <div className="relative">
                           <input 
-                            name="motherDob"
-                            value={formData.motherDob}
-                            onChange={(e) => handleDateChange(e, 'motherDob')}
-                            className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-white text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
-                            type="text"
-                            placeholder="DD-MM-YYYY (দিন-মাস-বছর)"
-                            maxLength={10}
-                          />
-                        </div>
-                      </div>
+                             name="motherDob"
+                             value={formData.motherDob || ''}
+                             onChange={(e) => handleDateChange(e, 'motherDob')}
+                             className="h-11 w-full rounded-lg border appearance-none px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring bg-white text-gray-800 border-gray-300 focus:border-blue-300 focus:ring-blue-500/20" 
+                             type="text"
+                             placeholder="DD-MM-YYYY (দিন-মাস-বছর)"
+                             maxLength={10}
+                           />
+                         </div>
+                       </div>
 
                 <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl space-y-4 shadow-inner">
                   <div className="flex items-center justify-between border-b border-gray-50 pb-2">

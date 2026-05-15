@@ -21,7 +21,7 @@ export const Navbar = () => {
     navigate('/login');
   };
 
-  const handleAddBalance = (e: React.FormEvent) => {
+  const handleAddBalance = (e) => {
     e.preventDefault();
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return;
     

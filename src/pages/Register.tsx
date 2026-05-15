@@ -7,6 +7,9 @@ import { UserPlus, Mail, Lock, User, Phone, MapPin, AlertCircle } from 'lucide-r
 import { motion } from 'motion/react';
 import Logo from '../components/ui/Logo';
 
+import { handleFirestoreError } from '../lib/error-handler';
+import { Application, OperationType } from '../types';
+
 const Register = () => {
   const [formData, setFormData] = useState({
     fullName: '',
@@ -32,14 +35,20 @@ const Register = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
-      await setDoc(doc(db, 'users', user.uid), {
-        fullName: formData.fullName,
-        phoneNumber: formData.phoneNumber,
-        address: formData.address,
-        photoURL: '',
-        role: 'user',
-        createdAt: Date.now()
-      });
+      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          fullName: formData.fullName,
+          phoneNumber: formData.phoneNumber,
+          address: formData.address,
+          photoURL: '',
+          role: 'user',
+          createdAt: Date.now(),
+          balance: 0
+        });
+      } catch (err: any) {
+        handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}`);
+        throw err;
+      }
 
       // Force a small delay to ensure Firestore write propagates before redirect
       setTimeout(() => navigate('/dashboard'), 500);
@@ -74,14 +83,20 @@ const Register = () => {
       const docSnap = await getDoc(docRef);
       
       if (!docSnap.exists()) {
-        await setDoc(doc(db, 'users', user.uid), {
-          fullName: user.displayName || 'নামহীন ইউজার',
-          phoneNumber: user.phoneNumber || '',
-          address: '',
-          photoURL: user.photoURL || '',
-          role: 'user',
-          createdAt: Date.now()
-        });
+        try {
+          await setDoc(doc(db, 'users', user.uid), {
+            fullName: user.displayName || 'নামহীন ইউজার',
+            phoneNumber: user.phoneNumber || '',
+            address: '',
+            photoURL: user.photoURL || '',
+            role: 'user',
+            createdAt: Date.now(),
+            balance: 0
+          });
+        } catch (err: any) {
+          handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}`);
+          throw err;
+        }
       }
       
       navigate('/dashboard');

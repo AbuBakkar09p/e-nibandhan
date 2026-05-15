@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import { User, Phone, MapPin, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { User, Phone, MapPin, Save, AlertCircle, CheckCircle, Camera, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
+
+import { handleFirestoreError } from '../lib/error-handler';
+import { OperationType } from '../types';
 
 const Profile = () => {
   const { user, profile } = useAuth();
@@ -16,6 +19,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -27,6 +31,24 @@ const Profile = () => {
       });
     }
   }, [profile]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) { // 1MB limit for Base64 in Firestore
+      setError('ছবির সাইজ ১ মেগাবাইটের কম হতে হবে।');
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, photoURL: reader.result as string }));
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +65,7 @@ const Profile = () => {
       });
       setSuccess('প্রোফাইল সফলভাবে আপডেট করা হয়েছে।');
     } catch (err: any) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
       setError('প্রোফাইল আপডেট করতে সমস্যা হয়েছে।');
     } finally {
       setLoading(false);
@@ -87,39 +109,46 @@ const Profile = () => {
           <form onSubmit={handleSubmit} className="space-y-8">
             <div className="flex flex-col items-center mb-8">
               <div className="relative group">
-                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-emerald-50 bg-slate-100 flex items-center justify-center text-slate-400 shadow-inner group-hover:border-emerald-200 transition-all">
-                  {formData.photoURL ? (
+                <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-white bg-slate-100 flex items-center justify-center text-slate-400 shadow-xl group-hover:border-emerald-100 transition-all relative">
+                  {uploading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">আপলোড হচ্ছে</span>
+                    </div>
+                  ) : formData.photoURL ? (
                     <img 
                       src={formData.photoURL} 
                       alt="Profile" 
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
-                      onError={() => setFormData(prev => ({ ...prev, photoURL: '' }))}
                     />
                   ) : (
                     <User size={64} />
                   )}
+                  
+                  <label className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <Camera size={24} className="text-white mb-1" />
+                    <span className="text-[8px] font-black text-white uppercase tracking-[0.2em]">পরিবর্তন করুন</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleFileChange}
+                    />
+                  </label>
                 </div>
-                <div className="absolute -bottom-2 translate-y-1/2 left-1/2 -translate-x-1/2 bg-white px-3 py-1 rounded-full border border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-widest shadow-sm">
-                  প্রিভিউ
-                </div>
+                
+                {formData.photoURL && (
+                   <button 
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, photoURL: '' }))}
+                    className="absolute -top-1 -right-1 w-8 h-8 bg-white rounded-full border border-slate-200 shadow-sm flex items-center justify-center text-rose-500 hover:bg-rose-50 transition-all"
+                  >
+                    <AlertCircle size={16} />
+                  </button>
+                )}
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 px-1">
-                <User size={14} className="text-emerald-600" />
-                প্রোফাইল ছবির লিংক (URL)
-              </label>
-              <input
-                type="url"
-                name="photoURL"
-                value={formData.photoURL}
-                onChange={handleChange}
-                className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-sm text-slate-600"
-                placeholder="https://example.com/photo.jpg"
-              />
-              <p className="text-[10px] text-slate-400 px-1">গুগল বা অন্য কোনো অনলাইন ছবির লিংক এখানে দিন</p>
+              <p className="mt-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest">প্রোফাইল ছবি পরিবর্তন করতে এখানে ক্লিক করুন</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

@@ -241,7 +241,7 @@ const VillageManagement = () => {
                   <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">ওয়ার্ড নম্বর</label>
                   <select
                     value={formData.wardNo}
-                    onChange={(e) => setFormData({ ...formData, wardNo: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, wardNo: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold appearance-none cursor-pointer"
                   >
                     {wards.map(w => (
@@ -256,7 +256,7 @@ const VillageManagement = () => {
                     <input
                       required
                       value={formData.villageNameBn}
-                      onChange={(e) => setFormData({ ...formData, villageNameBn: e.target.value })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, villageNameBn: e.target.value }))}
                       placeholder="রামপুর"
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     />
@@ -266,7 +266,7 @@ const VillageManagement = () => {
                     <input
                       required
                       value={formData.villageNameEn}
-                      onChange={(e) => setFormData({ ...formData, villageNameEn: e.target.value })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, villageNameEn: e.target.value }))}
                       placeholder="Rampur"
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     />
@@ -279,7 +279,7 @@ const VillageManagement = () => {
                     <input
                       required
                       value={formData.postOfficeBn}
-                      onChange={(e) => setFormData({ ...formData, postOfficeBn: e.target.value })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, postOfficeBn: e.target.value }))}
                       placeholder="রামপুর বাজার"
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     />
@@ -289,7 +289,7 @@ const VillageManagement = () => {
                     <input
                       required
                       value={formData.postOfficeEn}
-                      onChange={(e) => setFormData({ ...formData, postOfficeEn: e.target.value })}
+                      onChange={(e) => setFormData(prev => ({ ...prev, postOfficeEn: e.target.value }))}
                       placeholder="Rampur Bazar"
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     />

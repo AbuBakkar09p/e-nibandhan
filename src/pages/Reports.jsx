@@ -3,7 +3,7 @@ import { useParams, Navigate } from 'react-router-dom';
 import { collection, query, where, orderBy, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import { Application, OperationType, ApplicationType } from '../types';
+import { OperationType } from '../types';
 import { handleFirestoreError } from '../lib/error-handler';
 import { FileText, Clock, CheckCircle, XCircle, Search, Calendar, User, Phone, MapPin, X, Trash2, Edit2 } from 'lucide-react';
 import { toBengaliNumber } from '../lib/utils';
@@ -11,18 +11,18 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 
 const Reports = () => {
-  const { type } = useParams<{ type: string }>();
+  const { type } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [applications, setApplications] = useState<Application[]>([]);
+  const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [selectedApp, setSelectedApp] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'pending' | 'success'>('pending');
+  const [statusFilter, setStatusFilter] = useState('pending');
 
   // Map URL type to ApplicationType
-  const typeMap: Record<string, ApplicationType> = {
+  const typeMap = {
     'new-birth': 'new',
     'correction': 'correction',
     'death': 'death'
@@ -43,7 +43,7 @@ const Reports = () => {
 
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
-        const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application));
+        const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setApplications(apps);
         setLoading(false);
       },
@@ -60,7 +60,7 @@ const Reports = () => {
     return <Navigate to="/dashboard" />;
   }
 
-  const getStatusInfo = (status: string) => {
+  const getStatusInfo = (status) => {
     switch (status) {
       case 'pending': return { icon: <Clock size={12} />, text: 'যাচাই চলছে', color: 'text-amber-700 bg-amber-100 border-amber-200' };
       case 'processing': return { icon: <Clock size={12} />, text: 'প্রক্রিয়াধীন', color: 'text-blue-700 bg-blue-100 border-blue-200' };
@@ -92,7 +92,7 @@ const Reports = () => {
     return matchesSearch;
   });
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id) => {
     if (!window.confirm('আপনি কি নিশ্চিত যে আপনি এই আবেদনটি মুছে ফেলতে চান?')) return;
 
     setIsDeleting(true);
@@ -106,7 +106,7 @@ const Reports = () => {
     }
   };
 
-  const handleEdit = (app: Application) => {
+  const handleEdit = (app) => {
     navigate(`/apply/${app.type}?editId=${app.id}`);
   };
 
